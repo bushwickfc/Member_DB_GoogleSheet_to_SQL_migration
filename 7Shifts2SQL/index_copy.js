@@ -1,0 +1,163 @@
+const express = require('express')
+const bodyParser = require('body-parser')
+const store = require('./store')
+const app = express()
+const https = require('https');
+module.exports.init = fetch7Shifts();
+
+
+
+
+function fetch7Shifts() {
+  const apiKey = 'BXVEPDT89JSFKDM3TT6LSWD5KBR3WHCH';
+  // Build URL / Make request to API / get response
+
+  let options = {
+      host: 'https://api.7shifts.com/v1/shifts/',
+      path: '',
+      method: 'GET',
+      user     : 'BXVEPDT89JSFKDM3TT6LSWD5KBR3WHCH',
+      password : '',
+      headers: {
+          "Authorization" : "Basic "+ new Buffer('BXVEPDT89JSFKDM3TT6LSWD5KBR3WHCH' + ':' + '').toString('base64'),
+          'api_key' : 'BXVEPDT89JSFKDM3TT6LSWD5KBR3WHCH'
+          }
+      };
+
+  const req = https.request(options, (res) => {
+      //console.log('statusCode:', res.statusCode);
+      //console.log('headers:', res.headers);
+      console.log('statusCode:', res.statusCode);
+      console.log('headers:', res.headers);
+      res.on('data', (d) => {
+          process.stdout.write(d);
+      });
+      req.on('error', (e) => {
+          console.error(e);
+      });
+
+
+      res.setEncoding('utf8');
+      let rawData = '';
+      res.on('data', (chunk) => { rawData += chunk; });
+      res.on('end', () => {
+        try {
+          const parsedData = JSON.parse(rawData);
+          console.log(parsedData);
+        } catch (e) {
+          console.error(e.message);
+        }
+      });
+    }).on('error', (e) => {
+      console.error(`Got error: ${e.message}`);
+    });
+
+  req.end();
+
+  //console.log(req)
+  return req;
+}
+
+
+
+function buildURL() {
+
+  //Get variables for current date
+  var today = new Date();
+  var dd = today.getDate();
+  var mm = today.getMonth()+1; //January is 0!
+  var yyyy = today.getFullYear();
+
+  if(dd<10) {
+      dd = '0'+dd
+  }
+
+  if(mm<10) {
+      mm = '0'+mm
+  }
+  var baseURL = 'https://api.7shifts.com';
+
+  // Limit must be < 500, // date format: YYYY-MM-DD // deep=1 returns assoc. objs like User info
+  var startDate = 'start[gte]=' + yyyy + '-' + mm + '-' + dd - 1,
+    endDate = '&start[lte]=' + yyyy + '-' + mm + '-' + dd,
+    limit = '&limit=500',
+    includeAssocObjs = '&deep=1',
+    excludeOpenShifts = '&open=0',
+    excludeDeletedShifts = '&deleted=0';
+
+  var queries = //startDate + endDate + limit + includeAssocObjs + excludeOpenShifts + excludeDeletedShifts,
+    url = baseURL // + queries;
+
+  return url;
+}
+
+function parseJSON( response ) {
+// Parse JSON string to JSON Obj
+  var jsonString = response.getContentText();
+  var jsonObj = JSON.parse( jsonString );
+
+  return jsonObj;
+}
+
+
+
+
+
+
+function login() {
+  performRequest('api/session', 'POST', {
+    username: 'BXVEPDT89JSFKDM3TT6LSWD5KBR3WHCH',
+    password: '',
+    api_key_id: 'BXVEPDT89JSFKDM3TT6LSWD5KBR3WHCH',
+  }, function(data) {
+    sessionId = data.result.id;
+    console.log('Logged in:', sessionId);
+  }, function(data) {
+    console.log('Fetched ' + data.result.paging.total_items + ' cards');
+    getShifts();
+  });
+
+}
+
+function getShifts() {
+  performRequest('/v1/shifts/?', 'GET', {
+    session_id: sessionId,
+    "_items_per_page": 100
+  }, function(data) {
+    console.log('Fetched ' + data.result.paging.total_items + ' shifts');
+  });
+}
+
+login();
+
+
+
+
+
+
+
+
+app.use(express.static('public'))
+app.use(bodyParser.json())
+app.post('/createUser', (req, res) => {
+  store
+    .createUser({
+      username: req.body.username,
+      password: req.body.password
+    })
+    .then(() => res.sendStatus(200))
+})
+app.post('/login', (req, res) => {
+  store
+    .authenticate({
+      username: req.body.username,
+      password: req.body.password
+    })
+    .then(({ success }) => {
+      if (success) res.sendStatus(200)
+      else res.sendStatus(401)
+    })
+})
+app.listen(7555, () => {
+  console.log('Server running on http://localhost:7555')
+})
